@@ -1,0 +1,17 @@
+* Concorde! Concorde, speak to me!
+  
+  Concorde is my squire, who helps me to deal with email. His main job
+  is to yell 'Message for you, Sir!', when an interesting email
+  message appears in my inbox.
+
+  Technically, Concorde is a set ofscripts to orchestrate the notmuch
+  email indexing system.
+
+  Concorde understands instructions on how to sort out the incoming
+  mail, written in simple notmuch-tag-batch-like DSL.
+
+  Concorde is able to automatically tag letters based on:
+  - recipient subaddress (e.g. alexander+github@kolosov.xyz);
+  - standard maillist headers;
+  - spam status (using bogofilter).
+  
