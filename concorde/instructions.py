@@ -27,8 +27,8 @@ known_actions = {
 class Error(Exception):
     pass
 
-class InputError(Error):
-    """Exception raised for errors in the input.
+class ActionParseError(Error):
+    """Exception raised for actions parsing errors.
 
     Attributes:
         expr -- input expression in which the error occurred
@@ -39,20 +39,8 @@ class InputError(Error):
         self.expr = expr
         self.msg = msg
 
-class TransitionError(Error):
-    """Raised when an operation attempts a state transition that's not
-    allowed.
-
-    Attributes:
-        prev -- state at beginning of transition
-        next -- attempted new state
-        msg  -- explanation of why the specific transition is not allowed
-    """
-
-    def __init__(self, prev, next, msg):
-        self.prev = prev
-        self.next = next
-        self.msg = msg
+    def __str__(self):
+        return "%s: %s" % (self.expr, self.msg)
 
 def perform_action(action, msgs):
     return map(lambda m: action['func'](action['name'], action['args'], m),
@@ -62,9 +50,10 @@ def parse_action_token(action_token):
     action_char = action_token[0]
 
     if not action_char in known_actions:
-        # TODO: raise exception
-        return
-
+        raise ActionParseError(action_token,
+                               "Unknown action character '%s'. Expected be one of: '%s'." %
+                               (action_char, "', '".join(list(known_actions))))
+    
     # Parse action token
     m = ACTION_RE.match(action_token[1:])
     if not m:
@@ -118,7 +107,7 @@ def run_instructions(db, instrs):
 
         # Skip the line If it doesn't look like an instruction
         if not m:
-            logger.warning("Line %d couldn't be parsed. Skipping." % lines_counter)
+            logger.warning("Line %d: Instruction couldn't be parsed. Skipping." % lines_counter)
             continue
 
         # Extract actions and query from the instruction
@@ -126,7 +115,10 @@ def run_instructions(db, instrs):
         query = m.group(2)
 
         # Run actions, listed in the instruction
-        run_actions(db, actions, query)
+        try:
+            run_actions(db, actions, query)
+        except ActionParseError as e:
+            logger.error("Line %d: %s" % (lines_counter, e))
 
 def process_file(filename):
     logger.debug("Processing instructions file '%s'", filename)
