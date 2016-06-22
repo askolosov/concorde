@@ -43,10 +43,11 @@ class ActionParseError(Error):
         return "%s: %s" % (self.expr, self.msg)
 
 def perform_action(action, msgs):
-    return map(lambda m: action['func'](action['name'], action['args'], m),
-               msgs)
+    return [action['func'](action['name'], action['args'], m) for m in msgs]
 
 def parse_action_token(action_token):
+    logger.debug("Parsing action '%s'", action_token)
+    
     action_char = action_token[0]
 
     if not action_char in known_actions:
@@ -64,10 +65,12 @@ def parse_action_token(action_token):
     if not type(action_func) is dict:
         # If corresponding action is a simple action, then action token
         # contains only action arguments
+        logger.debug("Action %s is simple.", action_token)
 
         action_name = None
         action_args = re.split('\s*,\s*', m.group(1))
     else:
+        logger.debug("Action %s is complex.", action_token)
         # TODO: parse complex action token here
         
         # If it is an action with a name, then action token contains
@@ -77,16 +80,21 @@ def parse_action_token(action_token):
         action_args = re.split('\s*,\s*', m.group(3))
         action_func = action_func[action_name]
 
+    logger.debug("Action name: %s, arguments: %s, function: %s",
+                 action_name, action_args, action_func)
+    
     return dict(name=action_name, args=action_args, func=action_func)
 
 def run_actions(db, action_tokens, query_str):
     actions = map(parse_action_token, action_tokens)
+    logger.debug("Actions list successfully parsed.")
     
     query = notmuch.Query(db, query_str)
     msgs = query.search_messages()
 
+    logger.debug("Performing actions.")
     # Sequentially perform given actions on queried messages
-    reduce(lambda m, a: perform_action(a, m), actions, msgs)
+    reduce(lambda ms, act: perform_action(act, ms), actions, msgs)
     
 def run_instructions(db, instrs):
     lines_counter = 0
@@ -107,7 +115,7 @@ def run_instructions(db, instrs):
 
         # Skip the line If it doesn't look like an instruction
         if not m:
-            logger.warning("Line %d: Instruction couldn't be parsed. Skipping." % lines_counter)
+            logger.warning("Line %d: Instruction couldn't be parsed. Skipping.", lines_counter)
             continue
 
         # Extract actions and query from the instruction
@@ -116,6 +124,8 @@ def run_instructions(db, instrs):
 
         # Run actions, listed in the instruction
         try:
+            logger.debug("Trying to perform actions '%s' on the result of a query '%s'", actions, query)
+
             run_actions(db, actions, query)
         except ActionParseError as e:
             logger.error("Line %d: %s" % (lines_counter, e))
