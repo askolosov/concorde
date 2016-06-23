@@ -42,8 +42,8 @@ class ActionParseError(Error):
     def __str__(self):
         return "%s: %s" % (self.expr, self.msg)
 
-def perform_action(action, msgs):
-    return [action['func'](action['name'], action['args'], m) for m in msgs]
+def perform_action(action, msg):
+    return action['func'](action['name'], action['args'], msg)
 
 def parse_action_token(action_token):
     logger.debug("Parsing action '%s'", action_token)
@@ -93,8 +93,8 @@ def run_actions(db, action_tokens, query_str):
     msgs = query.search_messages()
 
     logger.debug("Performing actions.")
-    # Sequentially perform given actions on queried messages
-    reduce(lambda ms, act: perform_action(act, ms), actions, msgs)
+    # Sequentially perform given actions on each queried message
+    return [reduce(lambda m, a: a['func'](a['name'], a['args'], m), actions, msg) for msg in msgs]
     
 def run_instructions(db, instrs):
     lines_counter = 0
