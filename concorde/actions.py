@@ -1,19 +1,46 @@
+import re
 from . import logger
 
-def tag(name, args, msg):
-    logger.debug("Adding tag %s to message %s." % (tag, msg.get_message_id()))
-        
-    #msg.add_tag(tag)
+EMAIL_SUBADDR_RE = re.compile(r'[^\s<]+\+([^@\s]+)@[^\s>]+')
 
+def tag(name, args, msg):    
+    logger.debug("Adding tags %s to message %s.", args, msg.get_message_id())
+
+    #map(msg.add_tag, args)
+    
     return msg
 
 def untag(name, args, msg):
-    logger.debug( "Removing tag %s from message %s." % (tag, msg.get_message_id()))
+    logger.debug("Removing tags %s from message %s.", args, msg.get_message_id())
+    
+    #map(msg.remove_tag, args)
+    
     return msg
 
 def tag_by_subaddr(name, args, msg):
-    # TODO
-    pass
+    subaddr_presence_tag = None
+    # If argument is passed, then it is the tag, that should be set to
+    # the message if its recipient address has a subaddress part
+    if (len(args) > 0):
+        subaddr_presence_tag = args[0]
+    
+    to = msg.get_header("Delivered-To")
+    m = EMAIL_SUBADDR_RE.search(to)
+
+    # Skip the message if the recipient address doesn't have a
+    # subaddress part
+    if not m:
+        return msg
+
+    subaddr_tag = m.group(1)
+
+    logger.debug("Tag message %s with '%s'" %
+                 (msg.get_message_id(), subaddr_tag))
+        
+    # msg.add_tag(subaddr_tag)
+    # msg.add_tag(subaddr_presence_tag)
+
+    return msg
 
 def tag_by_list_headers(name, args, msg):
     # TODO
@@ -30,7 +57,6 @@ def learn_spam(name, args, msg):
 def learn_ham(name, args, msg):
     # TODO
     pass
-
 
 def purge(name, args, msg):
     # TODO
