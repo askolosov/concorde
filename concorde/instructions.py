@@ -1,23 +1,22 @@
 import re
 import notmuch
 import sys
-import actions
+import concorde.actions as actions
 from . import logger
 
 COMMENT_RE = re.compile('\s*#')
 EMPTYLINE_RE = re.compile('^\s*$')
+MULTILINE_INSTR_RE = re.compile(r'\\\s*$')
 INSTR_RE = re.compile('(.+)\s+--\s+(.+)')
 ACTION_RE = re.compile(r'([^(]+)(\(([^)]*)\))?')
 
 known_actions = {
     '+': actions.tag,
     '-': actions.untag,
-    '=': {
+    '%': {
         'by-subaddr': actions.tag_by_subaddr,
         'by-list-info': actions.tag_by_list_headers,
-        'by-spam-status': actions.tag_by_spam_status
-    },
-    '%': {
+        'by-spam-status': actions.tag_by_spam_status,
         'learn-spam': actions.learn_spam,
         'learn-ham': actions.learn_ham,
         'purge': actions.purge
@@ -41,9 +40,6 @@ class ActionParseError(Error):
 
     def __str__(self):
         return "%s: %s" % (self.expr, self.msg)
-
-def perform_action(action, msg):
-    return action['func'](action['name'], action['args'], msg)
 
 def parse_action_token(action_token):
     logger.debug("Parsing action '%s'", action_token)
@@ -70,7 +66,8 @@ def parse_action_token(action_token):
         action_name = None
         action_args = re.split('\s*,\s*', m.group(1))
     else:
-        logger.debug("Action %s is complex.", action_token)
+        logger.debug("Action '%s' is complex.", action_token)
+        logger.debug("Possible action names of this type: %s.", list(action_func))
         # TODO: parse complex action token here
         
         # If it is an action with a name, then action token contains
@@ -86,18 +83,26 @@ def parse_action_token(action_token):
     return dict(name=action_name, args=action_args, func=action_func)
 
 def run_actions(db, action_tokens, query_str):
-    actions = map(parse_action_token, action_tokens)
+    actions = [parse_action_token(tok) for tok in action_tokens]
     logger.debug("Actions list successfully parsed.")
     
     query = notmuch.Query(db, query_str)
     msgs = query.search_messages()
 
     logger.debug("Performing actions.")
+
     # Sequentially perform given actions on each queried message
-    return [reduce(lambda m, a: a['func'](a['name'], a['args'], m), actions, msg) for msg in msgs]
+    for m in msgs:
+        m.freeze()
+
+        for a in actions:
+            a['func'](a['name'], a['args'], m)
+
+        m.thaw()
     
 def run_instructions(db, instrs):
     lines_counter = 0
+    multline_start = None
     
     for line in instrs:
         lines_counter += 1
@@ -110,6 +115,18 @@ def run_instructions(db, instrs):
         if EMPTYLINE_RE.match(line):
             continue
 
+        # If previous line was an unfinished multiline instruction,
+        # then current line is its continuation        
+        if multline_start != None:
+            line = multline_start + line
+            
+        # If current line ends with '\', then it is an unfinished multiline instruction
+        if MULTILINE_INSTR_RE.search(line):
+            multline_start = MULTILINE_INSTR_RE.sub('', line)
+            continue
+        else:
+            multline_start = None
+        
         # Try to parse instruction in the line
         m = INSTR_RE.match(line)
 
@@ -130,9 +147,8 @@ def run_instructions(db, instrs):
         except ActionParseError as e:
             logger.error("Line %d: %s" % (lines_counter, e))
 
-def process_file(filename):
+def process_file(db, filename):
     logger.debug("Processing instructions file '%s'", filename)
     
-    with notmuch.Database(mode=notmuch.Database.MODE.READ_WRITE) as db:
-        with open(filename, 'r') as f:
-            run_instructions(db, f)
+    with open(filename, 'r') as f:
+        run_instructions(db, f)

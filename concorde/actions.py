@@ -6,16 +6,14 @@ EMAIL_SUBADDR_RE = re.compile(r'[^\s<]+\+([^@\s]+)@[^\s>]+')
 def tag(name, args, msg):    
     logger.debug("Adding tags %s to message %s.", args, msg.get_message_id())
 
-    #map(msg.add_tag, args)
-    
-    return msg
+    for tag in args:
+        msg.add_tag(tag)
 
 def untag(name, args, msg):
     logger.debug("Removing tags %s from message %s.", args, msg.get_message_id())
-    
-    #map(msg.remove_tag, args)
-    
-    return msg
+
+    for tag in args:
+        msg.remove_tag(tag)
 
 def tag_by_subaddr(name, args, msg):
     subaddr_presence_tag = None
@@ -30,17 +28,15 @@ def tag_by_subaddr(name, args, msg):
     # Skip the message if the recipient address doesn't have a
     # subaddress part
     if not m:
-        return msg
+        return
 
     subaddr_tag = m.group(1)
 
     logger.debug("Tag message %s with '%s'" %
                  (msg.get_message_id(), subaddr_tag))
         
-    # msg.add_tag(subaddr_tag)
-    # msg.add_tag(subaddr_presence_tag)
-
-    return msg
+    msg.add_tag(subaddr_tag)
+    msg.add_tag(subaddr_presence_tag)
 
 def tag_by_list_headers(name, args, msg):
     # TODO
