@@ -13,12 +13,16 @@ ACTION_RE = re.compile(r'([^(]+)(\(([^)]*)\))?')
 known_actions = {
     '+': actions.tag,
     '-': actions.untag,
-    '%': {
+    '=': {
         'by-subaddr': actions.tag_by_subaddr,
-        'by-list-info': actions.tag_by_list_headers,
+        'by-list-info': actions.tag_by_list_headers
+    },
+    '%': {
         'by-spam-status': actions.tag_by_spam_status,
         'learn-spam': actions.learn_spam,
         'learn-ham': actions.learn_ham,
+        'unlearn-spam': actions.unlearn_spam,
+        'unlearn-ham': actions.unlearn_ham,
         'purge': actions.purge
     }
 }
@@ -80,24 +84,36 @@ def parse_action_token(action_token):
     logger.debug("Action name: %s, arguments: %s, function: %s",
                  action_name, action_args, action_func)
     
-    return dict(name=action_name, args=action_args, func=action_func)
+    return dict(char=action_char, name=action_name, args=action_args,
+                func=action_func)
 
 def run_actions(db, action_tokens, query_str):
     actions = [parse_action_token(tok) for tok in action_tokens]
     logger.debug("Actions list successfully parsed.")
     
     query = notmuch.Query(db, query_str)
-    msgs = query.search_messages()
 
-    logger.debug("Performing actions.")
-
-    # Sequentially perform given actions on each queried message
-    for m in msgs:
+    per_message_actions = list(filter(lambda a: a['char'] != '%', actions))
+    bulk_actions = list(filter(lambda a: a['char'] == '%', actions))
+    
+    # Collect and list all queried messages
+    msgs = list()
+    for m in query.search_messages():
         m.freeze()
+        msgs.append(m)
 
-        for a in actions:
+    # Sequentially perform per message actions on each queried message
+    for m in msgs:
+        logger.debug('Processing message %s', m.get_message_id())
+        for a in per_message_actions:
             a['func'](a['name'], a['args'], m)
 
+    # Perform bulk actions on messages list
+    for a in bulk_actions:
+        a['func'](a['name'], a['args'], msgs)
+        
+    # Unfreeze messages
+    for m in msgs:
         m.thaw()
     
 def run_instructions(db, instrs):
