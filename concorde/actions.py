@@ -87,17 +87,17 @@ def tag_by_spam_status(name, args, msgs):
             m.add_tag(spam_tag)
     bgf.stdin.close()
 
-def train_bgf(msgs, bgf_arg, tag1, tag2):
+def train_bgf(msgs, bgf_arg, tag_to_add, tag_to_remove):
     bgf = subprocess.Popen(['bogofilter', bgf_arg],
                            stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
     for m in msgs:
         bgf.stdin.write(bytes(u'%s\n' % m.get_filename()))
-        if add_tag:
-            m.add_tag(tag1)
+        if tag_to_add:
+            m.add_tag(tag_to_add)
 
-        if remove_tag:
-            m.remove_tag(tag2)
+        if tag_to_remove:
+            m.remove_tag(tag_to_remove)
 
     bgf.stdin.close()
 
