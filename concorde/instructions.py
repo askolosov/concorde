@@ -22,8 +22,11 @@ known_actions = {
         'learn-spam': actions.learn_spam,
         'learn-ham': actions.learn_ham,
         'unlearn-spam': actions.unlearn_spam,
-        'unlearn-ham': actions.unlearn_ham,
-        'purge': actions.purge
+        'unlearn-ham': actions.unlearn_ham
+    },
+    '!': {
+        'purge': actions.purge,
+        'move': actions.move
     }
 }
 
@@ -93,8 +96,9 @@ def run_actions(db, action_tokens, query_str):
     
     query = notmuch.Query(db, query_str)
 
-    per_message_actions = list(filter(lambda a: a['char'] != '%', actions))
-    bulk_actions = list(filter(lambda a: a['char'] == '%', actions))
+    per_message_actions = list(filter(lambda a: re.match(r'[^%!]', a['char']), actions))
+    bulk_actions = list(filter(lambda a: re.match(r'%', a['char']), actions))
+    file_actions = list(filter(lambda a: re.match(r'!', a['char']), actions))
     
     # Collect and list all queried messages
     msgs = list()
@@ -106,16 +110,21 @@ def run_actions(db, action_tokens, query_str):
     for m in msgs:
         logger.debug('Processing message %s', m.get_message_id())
         for a in per_message_actions:
-            a['func'](a['name'], a['args'], m)
+            a['func'](db, a['name'], a['args'], m)
 
     # Perform bulk actions on messages list
     for a in bulk_actions:
-        a['func'](a['name'], a['args'], msgs)
+        a['func'](db, a['name'], a['args'], msgs)
         
     # Unfreeze messages
     for m in msgs:
         m.thaw()
-    
+
+    # Perform actions on message files
+    for a in file_actions:
+        a['func'](db, a['name'], a['args'], msgs)
+
+        
 def run_instructions(db, instrs):
     lines_counter = 0
     multline_start = None
