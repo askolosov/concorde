@@ -120,7 +120,7 @@ def purge(db, name, args, msgs):
         logger.info("Removing file of the message '%s'", m.get_message_id())
         try:
             os.remove(m.get_filename())
-        except OSError as e:
+        except Exception as e:
             logger.warning("Failed to remove file '%s': %s", m.get_filename(), e)
 
 def move(db, name, args, msgs):
