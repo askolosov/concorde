@@ -26,7 +26,7 @@ def tag_by_subaddr(db, name, args, msg):
     subaddr_presence_tag = None
     # If an argument is passed, then it is the tag, that should be set to
     # the message if its recipient address has a subaddress part
-    if (len(args) > 0):
+    if len(args) > 0:
         subaddr_presence_tag = args[0]
 
     try:
@@ -52,8 +52,8 @@ due to some internal notmuch problems. Skipping.", msg.get_message_id())
 
 def tag_by_list_headers(db, name, args, msg):
     # First argument - tag for messages in maillists
-    if (len(args) > 0):
-        maillist_indcator = args[0]
+    if len(args) > 0:
+        maillist_indicator = args[0]
 
     try:
         list_id_hdr = msg.get_header("List-Id")
@@ -120,7 +120,7 @@ def purge(db, name, args, msgs):
         logger.info("Removing file of the message '%s'", m.get_message_id())
         try:
             os.remove(m.get_filename())
-        except os.OSError as e:
+        except OSError as e:
             logger.warning("Failed to remove file '%s': %s", m.get_filename(), e)
 
 def move(db, name, args, msgs):
@@ -130,5 +130,5 @@ def move(db, name, args, msgs):
         logger.info("Moving file of the message '%s' to '%s'", m.get_message_id(), dest_dir)
         try:
             shutil.move(m.get_filename(), dest_dir)
-        except shutil.Error as e:
+        except Exception as e:
             logger.warning("Failed to move file '%s' to '%s': %s", m.get_filename(), dest_dir, e)
